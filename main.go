@@ -16,6 +16,8 @@ import (
 	"os"
 	"strconv"
 	"time"
+	"strconv"
+
 
 	"github.com/gorilla/mux"
 	"github.com/jinzhu/gorm"
@@ -106,29 +108,46 @@ type Charge struct {
 }
 
 func (iv *invoicer) getInvoice(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
-	log.Println("getting invoice id", vars["id"])
-	var i1 Invoice
-	id, _ := strconv.Atoi(vars["id"])
-	iv.db.First(&i1, id)
-	fmt.Printf("%+v\n", i1)
-	if i1.ID == 0 {
-		httpError(w, r, http.StatusNotFound, "No invoice id %s", vars["id"])
-		return
-	}
-	iv.db.Where("invoice_id = ?", i1.ID).Find(&i1.Charges)
-	jsonInvoice, err := json.Marshal(i1)
-	if err != nil {
-		httpError(w, r, http.StatusInternalServerError, "failed to retrieve invoice id %d: %s", vars["id"], err)
-		return
-	}
-	w.Header().Add("Content-Type", "application/json")
-	w.Header().Add("Access-Control-Allow-Origin", "*")
-	w.WriteHeader(http.StatusOK)
-	w.Write(jsonInvoice)
-	al := appLog{Message: fmt.Sprintf("retrieved invoice %d", i1.ID), Action: "get-invoice"}
-	al.log(r)
+    vars := mux.Vars(r)
+    log.Println("getting invoice id", vars["id"])
+
+    // Пробуем конвертнуть id в число
+    id, err := strconv.Atoi(vars["id"])
+    if err != nil {
+        httpError(w, r, http.StatusBadRequest, "invalid invoice id: %s", vars["id"])
+        return
+    }
+
+    var i1 Invoice
+    iv.db.First(&i1, id)
+    fmt.Printf("%+v\n", i1)
+
+    if i1.ID == 0 {
+        httpError(w, r, http.StatusNotFound, "No invoice id %d", id)
+        return
+    }
+
+    iv.db.Where("invoice_id = ?", i1.ID).Find(&i1.Charges)
+
+    jsonInvoice, err := json.Marshal(i1)
+    if err != nil {
+        httpError(w, r, http.StatusInternalServerError,
+            "failed to retrieve invoice id %d: %s", id, err)
+        return
+    }
+
+    w.Header().Add("Content-Type", "application/json")
+    w.Header().Add("Access-Control-Allow-Origin", "*")
+    w.WriteHeader(http.StatusOK)
+    w.Write(jsonInvoice)
+
+    al := appLog{
+        Message: fmt.Sprintf("retrieved invoice %d", i1.ID),
+        Action:  "get-invoice",
+    }
+    al.log(r)
 }
+
 
 func (iv *invoicer) postInvoice(w http.ResponseWriter, r *http.Request) {
 	log.Println("posting new invoice")
