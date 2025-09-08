@@ -6,23 +6,77 @@ jobs:
       - image: cimg/go:1.22
     steps:
       - checkout
-      - setup_remote_docker
-
       - run:
           name: Run tests
           command: go test ./...
-
       - run:
           name: Build binary
           command: go build -o bin/invoicer .
 
-      - deploy:
+  docker-push:
+    docker:
+      - image: cimg/base:stable
+    steps:
+      - checkout
+      - setup_remote_docker
+      - run:
+          name: Build and Push Docker image
           command: |
-            if [ "${CIRCLE_BRANCH}" == "master" ]; then
-              echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
-              IMAGE_NAME=dmitriydikt/invoicer-chapter2
-              IMAGE_TAG=${CIRCLE_SHA1:0:7}   # первые 7 символов коммита
-              docker build -t $IMAGE_NAME:latest -t $IMAGE_NAME:$IMAGE_TAG .
-              docker push $IMAGE_NAME:latest
-              docker push $IMAGE_NAME:$IMAGE_TAG
-            fi
+            echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin
+            IMAGE_NAME=dmitriydikt/invoicer-chapter2
+            IMAGE_TAG=${CIRCLE_SHA1:0:7}
+            docker build -t $IMAGE_NAME:latest -t $IMAGE_NAME:$IMAGE_TAG .
+            docker push $IMAGE_NAME:latest
+            docker push $IMAGE_NAME:$IMAGE_TAG
+
+  deploy:
+    docker:
+      - image: cimg/base:stable
+    steps:
+      - run:
+          name: Install YC CLI
+          command: |
+            curl -sSL https://storage.yandexcloud.net/yandexcloud-yc/install.sh | bash
+            export PATH=$PATH:$HOME/yandex-cloud/bin
+      - run:
+          name: Configure YC CLI
+          command: |
+            echo "$YC_KEY_JSON" > key.json
+            yc config set service-account-key key.json
+            yc config set folder-id $YC_FOLDER_ID
+            yc config set cloud-id $YC_CLOUD_ID
+      - run:
+          name: Deploy container
+          command: |
+            IMAGE_NAME=hefffner/invoicer-chapter2
+            yc compute instance create-with-container \
+              --name invoicer \
+              --zone ru-central1-a \
+              --cores 2 \
+              --memory 2G \
+              --core-fraction 20 \
+              --container-image docker.io/$IMAGE_NAME:latest \
+              --network-interface subnet-name=default,nat-ip-version=ipv4 \
+              --service-account-name invoicer-sa \
+              --ssh-key ~/.ssh/id_rsa.pub || \
+            yc compute instance update-container \
+              --name invoicer \
+              --container-image docker.io/$IMAGE_NAME:latest
+
+workflows:
+  version: 2
+  build-deploy:
+    jobs:
+      - build
+      - docker-push:
+          requires:
+            - build
+          filters:
+            branches:
+              only: master
+      - deploy:
+          requires:
+            - docker-push
+          filters:
+            branches:
+              only: master
