@@ -48,7 +48,7 @@ jobs:
       - run:
           name: Deploy container
           command: |
-            IMAGE_NAME=hefffner/invoicer-chapter2
+            IMAGE_NAME=dmitriydikt/invoicer-chapter2
             yc compute instance create-with-container \
               --name invoicer \
               --zone ru-central1-a \
