@@ -41,14 +41,14 @@ jobs:
             curl -sSL https://storage.yandexcloud.net/yandexcloud-yc/install.sh | bash
             echo 'export PATH=$HOME/yandex-cloud/bin:$PATH' >> $BASH_ENV
       - run:
-    name: Configure YC CLI
-    command: |
-      echo "$YC_KEY_JSON" > key.json
-      yc config profile create cicd \
-        --service-account-key key.json \
-        --cloud-id $YC_CLOUD_ID \
-        --folder-id $YC_FOLDER_ID
-      yc config profile activate cicd
+          name: Configure YC CLI
+          command: |
+            echo "$YC_KEY_JSON" > key.json
+            yc config profile create cicd \
+              --service-account-key key.json \
+              --cloud-id $YC_CLOUD_ID \
+              --folder-id $YC_FOLDER_ID
+            yc config profile activate cicd
 
       - run:
           name: Deploy container
