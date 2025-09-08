@@ -39,7 +39,7 @@ jobs:
           name: Install YC CLI
           command: |
             curl -sSL https://storage.yandexcloud.net/yandexcloud-yc/install.sh | bash
-            export PATH=$PATH:$HOME/yandex-cloud/bin
+            echo 'export PATH=$HOME/yandex-cloud/bin:$PATH' >> $BASH_ENV
       - run:
           name: Configure YC CLI
           command: |
